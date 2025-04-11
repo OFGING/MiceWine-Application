@@ -29,7 +29,7 @@
             android:exported="false">
         </activity>
         <activity
-            android:name=".activities.ControllerMapper"
+            android:name=".activities.PresetManagerActivity"
             android:theme="@style/Theme.MiceWine"
             android:exported="false">
         </activity>
@@ -45,18 +45,18 @@
             android:exported="false">
         </activity>
         <activity
-            android:name=".activities.Box64ManagerActivity"
+            android:name=".activities.RatManagerActivity"
             android:theme="@style/Theme.MiceWine"
             android:exported="false">
         </activity>
         <activity
-            android:name=".activities.DriverManagerActivity"
+            android:name=".activities.RatDownloaderActivity"
             android:theme="@style/Theme.MiceWine"
             android:exported="false">
         </activity>
         <activity
             android:name=".activities.MainActivity"
-            android:configChanges="orientation|screenSize"
+            android:configChanges="fontScale|orientation|screenSize|keyboard|keyboardHidden|layoutDirection|locale|mcc|mnc|navigation|screenLayout|touchscreen|uiMode|smallestScreenSize|density"
             android:exported="true"
             android:launchMode="singleTop"
             android:theme="@style/Theme.MiceWine">

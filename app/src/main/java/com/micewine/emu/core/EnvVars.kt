@@ -6,6 +6,7 @@ import android.os.Build
 import androidx.preference.PreferenceManager
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import com.micewine.emu.activities.MainActivity.Companion.adrenoToolsDriverFile
 import com.micewine.emu.activities.MainActivity.Companion.appLang
 import com.micewine.emu.activities.MainActivity.Companion.appRootDir
 import com.micewine.emu.activities.MainActivity.Companion.box64Avx
@@ -32,15 +33,17 @@ import com.micewine.emu.activities.MainActivity.Companion.box64ShowBt
 import com.micewine.emu.activities.MainActivity.Companion.box64ShowSegv
 import com.micewine.emu.activities.MainActivity.Companion.box64Sse42
 import com.micewine.emu.activities.MainActivity.Companion.enableDRI3
-import com.micewine.emu.activities.MainActivity.Companion.enableMangoHUD
 import com.micewine.emu.activities.MainActivity.Companion.homeDir
 import com.micewine.emu.activities.MainActivity.Companion.ratPackagesDir
 import com.micewine.emu.activities.MainActivity.Companion.selectedBox64
 import com.micewine.emu.activities.MainActivity.Companion.selectedDXVKHud
+import com.micewine.emu.activities.MainActivity.Companion.selectedGLProfile
 import com.micewine.emu.activities.MainActivity.Companion.selectedMesaVkWsiPresentMode
 import com.micewine.emu.activities.MainActivity.Companion.selectedTuDebugPreset
-import com.micewine.emu.activities.MainActivity.Companion.selectedGLProfile
+import com.micewine.emu.activities.MainActivity.Companion.selectedWine
+import com.micewine.emu.activities.MainActivity.Companion.strBoolToNumStr
 import com.micewine.emu.activities.MainActivity.Companion.tmpDir
+import com.micewine.emu.activities.MainActivity.Companion.useAdrenoTools
 import com.micewine.emu.activities.MainActivity.Companion.usrDir
 import com.micewine.emu.activities.MainActivity.Companion.wineESync
 import com.micewine.emu.activities.MainActivity.Companion.wineLogLevel
@@ -48,46 +51,41 @@ import com.micewine.emu.fragments.EnvVarsSettingsFragment.Companion.ENV_VARS_KEY
 import com.micewine.emu.fragments.EnvironmentVariable
 
 object EnvVars {
-    private val vars = LinkedHashMap<String, String>()
     private lateinit var sharedPreferences: SharedPreferences
 
     fun initialize(context: Context) {
         sharedPreferences = PreferenceManager.getDefaultSharedPreferences(context)
     }
 
-    private fun putVar(name: String, value: String?) {
-        vars[name] = "$name=\"$value\""
-    }
-
     fun getEnv(): String {
-        vars.clear()
+        val vars = mutableListOf<String>()
 
-        setEnv()
+        setEnv(vars)
 
         val savedVarsJson = sharedPreferences.getString(ENV_VARS_KEY, null)
         if (savedVarsJson != null) {
             val type = object : TypeToken<List<EnvironmentVariable>>() {}.type
 
             Gson().fromJson<List<EnvironmentVariable>>(savedVarsJson, type).forEach {
-                putVar(it.key, it.value)
+                vars.add("${it.key}=${it.value}")
             }
         }
 
-        return "env ${vars.values.joinToString(" ")} "
+        return "env ${vars.joinToString(" ")} "
     }
 
-    private fun setEnv() {
-        putVar("LANG", "$appLang.UTF-8")
-        putVar("TMPDIR", tmpDir.path)
-        putVar("HOME", homeDir.path)
-        putVar("XDG_CONFIG_HOME", "$homeDir/.config")
-        putVar("DISPLAY", ":0")
-        putVar("PULSE_LATENCY_MSEC", "60")
-        putVar("LD_LIBRARY_PATH", "/system/lib64:$usrDir/lib")
-        putVar("PATH", "\$PATH:$usrDir/bin:$appRootDir/wine/bin:$ratPackagesDir/$selectedBox64/files/usr/bin")
-        putVar("PREFIX", usrDir.path)
-        putVar("MESA_SHADER_CACHE_DIR", "$homeDir/.cache")
-        putVar("MESA_VK_WSI_PRESENT_MODE", selectedMesaVkWsiPresentMode)
+    private fun setEnv(vars: MutableList<String>) {
+        vars.add("LANG=$appLang.UTF-8")
+        vars.add("TMPDIR=$tmpDir")
+        vars.add("HOME=$homeDir")
+        vars.add("XDG_CONFIG_HOME=$homeDir/.config")
+        vars.add("DISPLAY=:0")
+        vars.add("PULSE_LATENCY_MSEC=60")
+        vars.add("LD_LIBRARY_PATH=/system/lib64:$usrDir/lib")
+        vars.add("PATH=\$PATH:$usrDir/bin:$ratPackagesDir/$selectedWine/files/wine/bin:$ratPackagesDir/$selectedBox64/files/usr/bin")
+        vars.add("PREFIX=$usrDir")
+        vars.add("MESA_SHADER_CACHE_DIR=$homeDir/.cache")
+        vars.add("MESA_VK_WSI_PRESENT_MODE=$selectedMesaVkWsiPresentMode")
 
         val glVersionStr = selectedGLProfile!!.split(" ")[1]
         val glslVersion =
@@ -100,62 +98,68 @@ object EnvVars {
                 else -> null
             }
 
-        putVar("MESA_GL_VERSION_OVERRIDE", glVersionStr)
-        putVar("MESA_GLSL_VERSION_OVERRIDE", glslVersion)
-        putVar("VK_ICD_FILENAMES", "$appRootDir/vulkan_icd.json")
+        vars.add("MESA_GL_VERSION_OVERRIDE=$glVersionStr")
+        vars.add("MESA_GLSL_VERSION_OVERRIDE=$glslVersion")
+        vars.add("VK_ICD_FILENAMES=$appRootDir/vulkan_icd.json")
 
-        putVar("GALLIUM_DRIVER", "zink")
-        putVar("TU_DEBUG", "$selectedTuDebugPreset")
-        putVar("ZINK_DEBUG", "compact")
-        putVar("ZINK_DESCRIPTORS", "lazy")
+        vars.add("GALLIUM_DRIVER=zink")
+        vars.add("TU_DEBUG=$selectedTuDebugPreset")
+        vars.add("ZINK_DEBUG=compact")
+        vars.add("ZINK_DESCRIPTORS=lazy")
 
         if (!enableDRI3) {
-            putVar("MESA_VK_WSI_DEBUG", "sw")
+            vars.add("MESA_VK_WSI_DEBUG=sw")
         }
 
-        putVar("DXVK_ASYNC", "1")
-        putVar("DXVK_STATE_CACHE_PATH", "$homeDir/.cache/dxvk-shader-cache")
-        putVar("DXVK_HUD", selectedDXVKHud)
-
-        if (enableMangoHUD) {
-            putVar("MANGOHUD", "1")
-            putVar("MANGOHUD_CONFIGFILE", "$usrDir/etc/MangoHud.conf")
-        }
+        vars.add("DXVK_ASYNC=1")
+        vars.add("DXVK_STATE_CACHE_PATH=$homeDir/.cache/dxvk-shader-cache")
+        vars.add("DXVK_HUD=$selectedDXVKHud")
+        vars.add("MANGOHUD=1")
+        vars.add("MANGOHUD_CONFIGFILE=$usrDir/etc/MangoHud.conf")
 
         if (Build.SUPPORTED_ABIS[0] != "x86_64") {
-            putVar("BOX64_LOG", box64LogLevel)
-            putVar("BOX64_CPUNAME", "ARM64 CPU")
-            putVar("BOX64_MMAP32", box64Mmap32)
-            putVar("BOX64_AVX", box64Avx)
-            putVar("BOX64_SSE42", box64Sse42)
-            putVar("BOX64_RCFILE", "$usrDir/etc/box64.box64rc")
-            putVar("BOX64_DYNAREC_BIGBLOCK", box64DynarecBigblock)
-            putVar("BOX64_DYNAREC_STRONGMEM", box64DynarecStrongmem)
-            putVar("BOX64_DYNAREC_WEAKBARRIER", box64DynarecWeakbarrier)
-            putVar("BOX64_DYNAREC_PAUSE", box64DynarecPause)
-            putVar("BOX64_DYNAREC_X87DOUBLE", box64DynarecX87double)
-            putVar("BOX64_DYNAREC_FASTNAN", box64DynarecFastnan)
-            putVar("BOX64_DYNAREC_FASTROUND", box64DynarecFastround)
-            putVar("BOX64_DYNAREC_SAFEFLAGS", box64DynarecSafeflags)
-            putVar("BOX64_DYNAREC_CALLRET", box64DynarecCallret)
-            putVar("BOX64_DYNAREC_ALIGNED_ATOMICS", box64DynarecAlignedAtomics)
-            putVar("BOX64_DYNAREC_NATIVEFLAGS", box64DynarecNativeflags)
-            putVar("BOX64_DYNAREC_BLEEDING_EDGE", box64DynarecBleedingEdge)
-            putVar("BOX64_DYNAREC_WAIT", box64DynarecWait)
-            putVar("BOX64_DYNAREC_DIRTY", box64DynarecDirty)
-            putVar("BOX64_DYNAREC_FORWARD", box64DynarecForward)
-            putVar("BOX64_SHOWSEGV", box64ShowSegv)
-            putVar("BOX64_SHOWBT", box64ShowBt)
-            putVar("BOX64_NOSIGSEGV", box64NoSigSegv)
-            putVar("BOX64_NOSIGILL", box64NoSigill)
+            vars.add("BOX64_LOG=$box64LogLevel")
+            vars.add("BOX64_CPUNAME=\"ARM64 CPU\"")
+            vars.add("BOX64_MMAP32=$box64Mmap32")
+            vars.add("BOX64_AVX=$box64Avx")
+            vars.add("BOX64_SSE42=$box64Sse42")
+            vars.add("BOX64_RCFILE=$usrDir/etc/box64.box64rc")
+            vars.add("BOX64_DYNAREC_BIGBLOCK=$box64DynarecBigblock")
+            vars.add("BOX64_DYNAREC_STRONGMEM=$box64DynarecStrongmem")
+            vars.add("BOX64_DYNAREC_WEAKBARRIER=$box64DynarecWeakbarrier")
+            vars.add("BOX64_DYNAREC_PAUSE=$box64DynarecPause")
+            vars.add("BOX64_DYNAREC_X87DOUBLE=$box64DynarecX87double")
+            vars.add("BOX64_DYNAREC_FASTNAN=$box64DynarecFastnan")
+            vars.add("BOX64_DYNAREC_FASTROUND=$box64DynarecFastround")
+            vars.add("BOX64_DYNAREC_SAFEFLAGS=$box64DynarecSafeflags")
+            vars.add("BOX64_DYNAREC_CALLRET=$box64DynarecCallret")
+            vars.add("BOX64_DYNAREC_ALIGNED_ATOMICS=$box64DynarecAlignedAtomics")
+            vars.add("BOX64_DYNAREC_NATIVEFLAGS=$box64DynarecNativeflags")
+            vars.add("BOX64_DYNAREC_BLEEDING_EDGE=$box64DynarecBleedingEdge")
+            vars.add("BOX64_DYNAREC_WAIT=$box64DynarecWait")
+            vars.add("BOX64_DYNAREC_DIRTY=$box64DynarecDirty")
+            vars.add("BOX64_DYNAREC_FORWARD=$box64DynarecForward")
+            vars.add("BOX64_SHOWSEGV=$box64ShowSegv")
+            vars.add("BOX64_SHOWBT=$box64ShowBt")
+            vars.add("BOX64_NOSIGSEGV=$box64NoSigSegv")
+            vars.add("BOX64_NOSIGILL=$box64NoSigill")
         }
 
-        putVar("VKD3D_FEATURE_LEVEL", "12_0")
+        vars.add("VKD3D_FEATURE_LEVEL=12_0")
 
-        if (wineLogLevel == "minimal") {
-            putVar("WINEDEBUG", "-fixme,-debug,-keyboard")
+        if (wineLogLevel == "disabled") {
+            vars.add("WINEDEBUG=-all")
         }
 
-        putVar("WINEESYNC", wineESync)
+        vars.add("WINE_Z_DISK=$appRootDir")
+        vars.add("WINEESYNC=${strBoolToNumStr(wineESync)}")
+
+        if (useAdrenoTools) {
+            vars.add("USE_ADRENOTOOLS=1")
+            vars.add("ADRENOTOOLS_CUSTOM_DRIVER_DIR=${adrenoToolsDriverFile?.parent}/")
+            vars.add("ADRENOTOOLS_CUSTOM_DRIVER_NAME=${adrenoToolsDriverFile?.name}")
+            // Workaround for dlopen error (at least on my device)
+            vars.add("LD_PRELOAD=/system/lib64/libEGL.so:/system/lib64/libGLESv1_CM.so")
+        }
     }
 }

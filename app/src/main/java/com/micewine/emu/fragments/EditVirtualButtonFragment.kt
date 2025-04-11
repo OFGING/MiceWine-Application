@@ -18,10 +18,15 @@ import com.micewine.emu.R
 import com.micewine.emu.activities.VirtualControllerOverlayMapper.Companion.ACTION_INVALIDATE
 import com.micewine.emu.controller.XKeyCodes.getKeyNames
 import com.micewine.emu.controller.XKeyCodes.getXKeyScanCodes
+import com.micewine.emu.views.OverlayView.Companion.SHAPE_CIRCLE
+import com.micewine.emu.views.OverlayView.Companion.SHAPE_RECTANGLE
+import com.micewine.emu.views.OverlayView.Companion.SHAPE_SQUARE
 import com.micewine.emu.views.OverlayView.Companion.analogList
 import com.micewine.emu.views.OverlayView.Companion.buttonList
+import com.micewine.emu.views.OverlayView.Companion.dpadList
 import com.micewine.emu.views.OverlayViewCreator.Companion.ANALOG
 import com.micewine.emu.views.OverlayViewCreator.Companion.BUTTON
+import com.micewine.emu.views.OverlayViewCreator.Companion.DPAD
 import com.micewine.emu.views.OverlayViewCreator.Companion.lastSelectedButton
 import com.micewine.emu.views.OverlayViewCreator.Companion.lastSelectedType
 
@@ -31,6 +36,7 @@ class EditVirtualButtonFragment : DialogFragment() {
         val inflater = requireActivity().layoutInflater
         val view = inflater.inflate(R.layout.fragment_edit_virtual_button, null)
         val saveButton = view.findViewById<Button>(R.id.saveButton)
+        val cancelButton = view.findViewById<Button>(R.id.cancelButton)
         val radiusSeekbarValue = view.findViewById<TextView>(R.id.radiusSeekbarValue).apply {
             text = "$selectedButtonRadius%"
         }
@@ -42,7 +48,8 @@ class EditVirtualButtonFragment : DialogFragment() {
                 OnSeekBarChangeListener {
                 @SuppressLint("SetTextI18n")
                 override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                    radiusSeekbarValue?.text = "$progress%"
+                    seekBar?.progress = Math.round(progress.toFloat() / 5) * 5
+                    radiusSeekbarValue?.text = "${seekBar?.progress}%"
                 }
 
                 override fun onStartTrackingTouch(seekBar: SeekBar?) {
@@ -53,8 +60,20 @@ class EditVirtualButtonFragment : DialogFragment() {
             })
         }
 
-        val allKeyNames = getKeyNames(true)
+        val allKeyNames = getKeyNames(lastSelectedType != ANALOG)
+        val shapes = listOf("Circle", "Square", "Rectangle")
 
+        val shapeSpinner = view.findViewById<Spinner>(R.id.shapeSpinner).apply {
+            adapter = ArrayAdapter(context, android.R.layout.simple_spinner_dropdown_item, shapes)
+            setSelection(
+                when (selectedButtonShape) {
+                    SHAPE_CIRCLE -> 0
+                    SHAPE_SQUARE -> 1
+                    SHAPE_RECTANGLE -> 2
+                    else -> -1
+                }
+            )
+        }
         val buttonSpinner = view.findViewById<Spinner>(R.id.buttonSpinner).apply {
             adapter = ArrayAdapter(context, android.R.layout.simple_spinner_dropdown_item, allKeyNames)
             setSelection(allKeyNames.indexOf(selectedButtonKeyName))
@@ -78,8 +97,12 @@ class EditVirtualButtonFragment : DialogFragment() {
 
         radiusSeekbar.progress = selectedButtonRadius
 
-        if (lastSelectedType == ANALOG) {
+        if (lastSelectedType == ANALOG || lastSelectedType == DPAD) {
+            view.findViewById<TextView>(R.id.shapeText).visibility = View.GONE
+            view.findViewById<TextView>(R.id.buttonMappingText).visibility = View.GONE
+
             buttonSpinner.visibility = View.GONE
+            shapeSpinner.visibility = View.GONE
         } else if (lastSelectedType == BUTTON) {
             view.findViewById<LinearLayout>(R.id.layoutAnalogUp).visibility = View.GONE
             view.findViewById<LinearLayout>(R.id.layoutAnalogDown).visibility = View.GONE
@@ -95,6 +118,12 @@ class EditVirtualButtonFragment : DialogFragment() {
                 buttonList[lastSelectedButton - 1].keyCodes = getXKeyScanCodes(buttonSpinner.selectedItem.toString())
 
                 buttonList[lastSelectedButton - 1].radius = radiusSeekbar.progress.toFloat()
+
+                when (shapeSpinner.selectedItem.toString()) {
+                    "Circle" -> buttonList[lastSelectedButton - 1].shape = SHAPE_CIRCLE
+                    "Square" -> buttonList[lastSelectedButton - 1].shape = SHAPE_SQUARE
+                    "Rectangle" -> buttonList[lastSelectedButton - 1].shape = SHAPE_RECTANGLE
+                }
             } else if (lastSelectedType == ANALOG && analogList.isNotEmpty()) {
                 analogList[lastSelectedButton - 1].upKeyName = analogUpKeySpinner.selectedItem.toString()
                 analogList[lastSelectedButton - 1].upKeyCodes = getXKeyScanCodes(analogUpKeySpinner.selectedItem.toString())
@@ -109,12 +138,30 @@ class EditVirtualButtonFragment : DialogFragment() {
                 analogList[lastSelectedButton - 1].rightKeyCodes = getXKeyScanCodes(analogRightKeySpinner.selectedItem.toString())
 
                 analogList[lastSelectedButton - 1].radius = radiusSeekbar.progress.toFloat()
+            } else if (lastSelectedType == DPAD && dpadList.isNotEmpty()) {
+                dpadList[lastSelectedButton - 1].upKeyName = analogUpKeySpinner.selectedItem.toString()
+                dpadList[lastSelectedButton - 1].upKeyCodes = getXKeyScanCodes(analogUpKeySpinner.selectedItem.toString())
+
+                dpadList[lastSelectedButton - 1].downKeyName = analogDownKeySpinner.selectedItem.toString()
+                dpadList[lastSelectedButton - 1].downKeyCodes = getXKeyScanCodes(analogDownKeySpinner.selectedItem.toString())
+
+                dpadList[lastSelectedButton - 1].leftKeyName = analogLeftKeySpinner.selectedItem.toString()
+                dpadList[lastSelectedButton - 1].leftKeyCodes = getXKeyScanCodes(analogLeftKeySpinner.selectedItem.toString())
+
+                dpadList[lastSelectedButton - 1].rightKeyName = analogRightKeySpinner.selectedItem.toString()
+                dpadList[lastSelectedButton - 1].rightKeyCodes = getXKeyScanCodes(analogRightKeySpinner.selectedItem.toString())
+
+                dpadList[lastSelectedButton - 1].radius = radiusSeekbar.progress.toFloat()
             }
 
             context?.sendBroadcast(
                 Intent(ACTION_INVALIDATE)
             )
 
+            dismiss()
+        }
+
+        cancelButton.setOnClickListener {
             dismiss()
         }
 
@@ -127,6 +174,7 @@ class EditVirtualButtonFragment : DialogFragment() {
         var selectedAnalogDownKeyName = ""
         var selectedAnalogLeftKeyName = ""
         var selectedAnalogRightKeyName = ""
+        var selectedButtonShape = -1
         var selectedButtonRadius = 0
     }
 }

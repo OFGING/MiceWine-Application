@@ -1,19 +1,15 @@
 package com.micewine.emu.adapters
 
 import android.annotation.SuppressLint
-import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
-import com.getkeepsafe.taptargetview.TapTarget
-import com.getkeepsafe.taptargetview.TapTargetView
 import com.micewine.emu.R
 import com.micewine.emu.activities.MainActivity.Companion.ACTION_SELECT_FILE_MANAGER
 import com.micewine.emu.activities.MainActivity.Companion.customRootFSPath
@@ -22,9 +18,11 @@ import com.micewine.emu.activities.MainActivity.Companion.fileManagerDefaultDir
 import com.micewine.emu.activities.MainActivity.Companion.selectedFile
 import com.micewine.emu.activities.MainActivity.Companion.usrDir
 import com.micewine.emu.core.WineWrapper.extractIcon
+import com.micewine.emu.fragments.FloatingFileManagerFragment.Companion.outputFile
 import com.micewine.emu.fragments.FloatingFileManagerFragment.Companion.refreshFiles
 import com.micewine.emu.utils.DriveUtils
 import mslinks.ShellLink
+import mslinks.ShellLinkException
 import java.io.File
 import kotlin.math.round
 
@@ -43,6 +41,8 @@ class AdapterFiles(private val fileList: List<FileList>, private val context: Co
         } else {
             holder.fileName.text = sList.file.name
         }
+
+        holder.fileName.isSelected = true
 
         if (sList.file.isDirectory) {
             holder.icon.setImageResource(R.drawable.ic_folder)
@@ -74,36 +74,39 @@ class AdapterFiles(private val fileList: List<FileList>, private val context: Co
             val fileExtension = sList.file.extension.lowercase()
 
             if (fileExtension == "exe") {
-                val output = "$usrDir/icons/${sList.file.nameWithoutExtension}-icon.ico"
+                val output = File("$usrDir/icons/${sList.file.nameWithoutExtension}-icon")
 
-                extractIcon(sList.file, output)
+                extractIcon(sList.file, output.path)
 
-                if (File(output).exists()) {
-                    holder.icon.setImageBitmap(BitmapFactory.decodeFile(output))
+                if (output.exists() && output.length() > 0) {
+                    holder.icon.setImageBitmap(BitmapFactory.decodeFile(output.path))
                 } else {
                     holder.icon.setImageResource(R.drawable.ic_log)
                 }
             } else if (fileExtension == "lnk") {
-                val shell = ShellLink(sList.file)
-                val drive = DriveUtils.parseWindowsPath(shell.resolveTarget())
+                try {
+                    val shell = ShellLink(sList.file)
+                    val drive = DriveUtils.parseWindowsPath(shell.resolveTarget())
+                    if (drive != null) {
+                        val filePath = File(drive.getUnixPath())
 
-                if (drive != null) {
-                    val filePath = File(drive.getUnixPath())
+                        val output = File("$usrDir/icons/${filePath.nameWithoutExtension}-icon")
 
-                    val output = "$usrDir/icons/${filePath.nameWithoutExtension}-icon.ico"
+                        extractIcon(filePath, output.path)
 
-                    extractIcon(filePath, output)
-
-                    if (File(output).exists()) {
-                        holder.icon.setImageBitmap(BitmapFactory.decodeFile(output))
+                        if (output.exists() && output.length() > 0) {
+                            holder.icon.setImageBitmap(BitmapFactory.decodeFile(output.path))
+                        } else {
+                            holder.icon.setImageResource(R.drawable.ic_log)
+                        }
                     } else {
                         holder.icon.setImageResource(R.drawable.ic_log)
                     }
-                } else {
+                } catch (_: ShellLinkException) {
                     holder.icon.setImageResource(R.drawable.ic_log)
                 }
-            } else if (fileExtension == "rat") {
-                holder.icon.setImageResource(R.drawable.icon_grayscale)
+            } else if (fileExtension == "rat" || fileExtension == "mwp") {
+                holder.icon.setImageResource(R.drawable.ic_rat_package)
             } else {
                 holder.icon.setImageResource(R.drawable.ic_log)
             }
@@ -133,12 +136,14 @@ class AdapterFiles(private val fileList: List<FileList>, private val context: Co
 
             if (isFloatFilesDialog) {
                 if (settingsModel.file.name == "..") {
-                    fileManagerCwd = File(fileManagerCwd).parent!!
+                    fileManagerCwd = File(fileManagerCwd!!).parent!!
 
                     refreshFiles()
                 } else if (settingsModel.file.isFile) {
                     if (settingsModel.file.name.contains(".rat")) {
                         customRootFSPath = settingsModel.file.path
+                    } else {
+                        outputFile = settingsModel.file.path
                     }
                 } else if (settingsModel.file.isDirectory) {
                     fileManagerCwd = settingsModel.file.path

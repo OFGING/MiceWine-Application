@@ -1,7 +1,7 @@
 package com.micewine.emu.core
 
 import android.os.Build
-import com.micewine.emu.activities.MainActivity.Companion.cpuAffinity
+import com.micewine.emu.activities.MainActivity.Companion.selectedCpuAffinity
 import com.micewine.emu.activities.MainActivity.Companion.wineDisksFolder
 import com.micewine.emu.activities.MainActivity.Companion.winePrefix
 import com.micewine.emu.core.EnvVars.getEnv
@@ -13,22 +13,16 @@ import kotlin.math.abs
 object WineWrapper {
     private var IS_BOX64 = if (Build.SUPPORTED_ABIS[0] == "x86_64") "" else "box64"
 
-    private fun getCpuHexMask(): String {
+    fun getCpuHexMask(): String {
         val availCpus = Runtime.getRuntime().availableProcessors()
         val cpuMask = MutableList(availCpus) { '0' }
-        val cpuAffinity = cpuAffinity?.replace(",", "")
+        val cpuAffinity = selectedCpuAffinity!!.replace(",", "")
 
-        for (i in 0..<cpuAffinity!!.length) {
-            cpuMask[abs(cpuAffinity[i].toString().toInt() - availCpus) - 1] = '1'
+        for (element in cpuAffinity) {
+            cpuMask[abs(element.toString().toInt() - availCpus) - 1] = '1'
         }
 
         return Integer.toHexString(cpuMask.joinToString("").toInt(2))
-    }
-
-    fun wineServer(args: String) {
-        runCommand(
-            getEnv() + "$IS_BOX64 wineserver $args"
-        )
     }
 
     fun waitFor(name: String) {
@@ -39,14 +33,14 @@ object WineWrapper {
 
     fun wine(args: String) {
         runCommand(
-            getEnv() + "WINEPREFIX=$winePrefix taskset ${getCpuHexMask()} $IS_BOX64 wine $args"
+            getEnv() + "WINEPREFIX='$winePrefix' $IS_BOX64 wine $args"
         )
     }
 
     fun wine(args: String, retLog: Boolean): String {
         if (retLog) {
             return runCommandWithOutput(
-                getEnv() + "BOX64_LOG=0 WINEPREFIX=$winePrefix taskset ${getCpuHexMask()} $IS_BOX64 wine $args"
+                getEnv() + "BOX64_LOG=0 WINEPREFIX='$winePrefix' $IS_BOX64 wine $args"
             )
         }
         return ""
@@ -54,8 +48,7 @@ object WineWrapper {
 
     fun wine(args: String, cwd: String) {
         runCommand(
-            "cd $cwd;" +
-                    getEnv() + "WINEPREFIX=$winePrefix taskset ${getCpuHexMask()} $IS_BOX64 wine $args"
+            "cd $cwd;" + getEnv() + "WINEPREFIX='$winePrefix' $IS_BOX64 wine $args"
         )
     }
 
@@ -75,7 +68,7 @@ object WineWrapper {
         runCommand("ln -sf $path $wineDisksFolder/${getAvailableDisks()[0]}:")
     }
 
-    fun getAvailableDisks(): List<String> {
+    private fun getAvailableDisks(): List<String> {
         var letter = 'c'
         val availableDisks = mutableListOf<String>()
 
@@ -92,12 +85,12 @@ object WineWrapper {
     fun extractIcon(exeFile: File, output: String) {
         if (exeFile.extension.lowercase() == "exe") {
             runCommand(
-                getEnv() + "wrestool -x -t 14 '${getSanatizedPath(exeFile.path)}' > '$output'"
+                getEnv() + "wrestool -x -t 14 '${getSanitizedPath(exeFile.path)}' > '$output'"
             )
         }
     }
 
-    fun getSanatizedPath(filePath: String) : String {
-       return filePath.replace("'", "'\\''")
+    fun getSanitizedPath(filePath: String) : String {
+        return filePath.replace("'", "'\\''")
     }
 }

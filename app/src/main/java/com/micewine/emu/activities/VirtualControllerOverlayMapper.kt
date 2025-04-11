@@ -22,6 +22,7 @@ import com.micewine.emu.controller.XKeyCodes.getXKeyScanCodes
 import com.micewine.emu.databinding.ActivityVirtualControllerMapperBinding
 import com.micewine.emu.fragments.EditVirtualButtonFragment
 import com.micewine.emu.views.OverlayView
+import com.micewine.emu.views.OverlayView.Companion.SHAPE_CIRCLE
 import com.micewine.emu.views.OverlayView.Companion.analogList
 import com.micewine.emu.views.OverlayView.Companion.buttonList
 import com.micewine.emu.views.OverlayViewCreator
@@ -63,10 +64,11 @@ class VirtualControllerOverlayMapper : AppCompatActivity() {
                             overlayView?.width!! / 2F,
                             overlayView?.height!! / 2F,
                             180F,
-                            "Null",
+                            "--",
                             null,
                             -1,
-                            false
+                            false,
+                            SHAPE_CIRCLE
                         )
                     )
 
@@ -82,17 +84,43 @@ class VirtualControllerOverlayMapper : AppCompatActivity() {
                             0F,
                             0F,
                             275F,
-                            "Null",
-                            getXKeyScanCodes(""),
-                            "Null",
-                            getXKeyScanCodes(""),
-                            "Null",
-                            getXKeyScanCodes(""),
-                            "Null",
-                            getXKeyScanCodes(""),
+                            "--",
+                            getXKeyScanCodes("--"),
+                            "--",
+                            getXKeyScanCodes("--"),
+                            "--",
+                            getXKeyScanCodes("--"),
+                            "--",
+                            getXKeyScanCodes("--"),
                             false,
                             -1,
-                            0.5F
+                            0.75F
+                        )
+                    )
+
+                    virtualControllerMapperDrawerLayout?.closeDrawers()
+                }
+
+                R.id.addDPad -> {
+                    overlayView?.addDPad(
+                        OverlayView.VirtualDPad(
+                            analogList.count() + 1,
+                            overlayView?.width!! / 2F,
+                            overlayView?.height!! / 2F,
+                            275F,
+                            "--",
+                            getXKeyScanCodes("--"),
+                            "--",
+                            getXKeyScanCodes("--"),
+                            "--",
+                            getXKeyScanCodes("--"),
+                            "--",
+                            getXKeyScanCodes("--"),
+                            -1,
+                            false,
+                            0F,
+                            0F,
+                            0
                         )
                     )
 
